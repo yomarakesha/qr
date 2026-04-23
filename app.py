@@ -9,7 +9,7 @@ import qrcode
 from qrcode.constants import ERROR_CORRECT_L, ERROR_CORRECT_M, ERROR_CORRECT_Q, ERROR_CORRECT_H
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "contacts.db")
+DB_PATH = os.environ.get("DB_PATH", os.path.join(BASE_DIR, "contacts.db"))
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
@@ -306,6 +306,9 @@ def preview_vcard():
     return jsonify({"vcard": build_vcard(data)})
 
 
+init_db()
+
 if __name__ == "__main__":
-    init_db()
-    app.run(host="127.0.0.1", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    debug = os.environ.get("FLASK_DEBUG", "0") == "1"
+    app.run(host="0.0.0.0", port=port, debug=debug)
