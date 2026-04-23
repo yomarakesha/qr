@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="tk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR vCard — Kontakt generatory</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <h1>QR kod generatory</h1>
+    <div class="subtitle">Işgärler üçin vCard kontakt kartlaryny dörediň we dolandyryň</div>
+    <!-- <div class="badges">
+      <span class="badge"><span class="dot"></span> Flask + SQLite</span>
+      <span class="badge">vCard 3.0</span>
+      <span class="badge">PNG eksport</span>
+    </div> -->
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <div class="edit-banner" id="editBanner">
+          <span>Redaktirleme: <b id="editLabel"></b></span>
+          <div style="display:flex; gap:6px;">
+            <button type="button" id="newBtn">+ Täze ýazgy</button>
+            <button type="button" id="cancelEdit">Ýatyrmak</button>
+          </div>
+        </div>
+        <h2>Işgär maglumatlary</h2>
+        <form id="form" novalidate>
+          <div class="row">
+            <div class="field">
+              <label>Familiýa <span class="req">*</span></label>
+              <input type="text" id="lastName" required>
+              <div class="error" data-for="lastName">Familiýany giriziň</div>
+            </div>
+            <div class="field">
+              <label>Ady <span class="req">*</span></label>
+              <input type="text" id="firstName" required>
+              <div class="error" data-for="firstName">Adyny giriziň</div>
+            </div>
+          </div>
+          <div class="field">
+            <label>Wezipe</label>
+            <input type="text" id="title">
+          </div>
+          <div class="field">
+            <label>Bölüm ady</label>
+            <input type="text" id="department">
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>Telefon</label>
+              <input type="tel" id="phone" placeholder="+99366666666">
+              <div class="hint">Diňe + we sanlar</div>
+              <div class="error" data-for="phone">Nädogry telefon belgisi</div>
+            </div>
+            <div class="field">
+              <label>E-poçta</label>
+              <input type="email" id="email" placeholder="ady@mysal.com">
+              <div class="error" data-for="email">Nädogry e-poçta</div>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="card" style="margin-top: 20px;">
+        <h2>QR sazlamalary</h2>
+        <div class="field">
+          <label>Faýl ady</label>
+          <input type="text" id="fileName">
+          <div class="hint">Adyndan awtomatiki doldurýar (transliterasiýa)</div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Ölçeg, px</label>
+            <select id="size">
+              <option value="300">300</option>
+              <option value="600" selected>600</option>
+              <option value="1200">1200</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Ýalňyşlyk düzedişi</label>
+            <select id="ecl">
+              <option value="L">L (pes)</option>
+              <option value="M" selected>M (orta)</option>
+              <option value="Q">Q (ýokary)</option>
+              <option value="H">H (iň ýokary)</option>
+            </select>
+          </div>
+        </div>
+        <div class="buttons">
+          <button type="button" id="previewBtn" class="ghost-blue">vCard öňünden görkezmek</button>
+          <button type="button" id="saveBtn" class="success">Saklamak we döretmek</button>
+          <button type="button" id="downloadBtn" class="ghost-green" disabled>PNG göçürip almak</button>
+        </div>
+        <div class="status-msg" id="statusMsg"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2>QR kod</h2>
+        <div class="qr-box" id="qrBox">
+          <span class="qr-placeholder">QR saklandan soň görkeziler</span>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 20px;">
+        <h2>vCard</h2>
+        <div class="preview-vcard" id="vcardPreview">"vCard öňünden görkezmek" düwmesine basyň</div>
+      </div>
+
+      <div class="card" style="margin-top: 20px;">
+        <div class="history-header">
+          <h2>Kontaktlar bazasy <span class="count" id="historyCount">0</span></h2>
+          <button type="button" id="refreshBtn" class="ghost-blue">Täzelemek</button>
+        </div>
+        <div class="history-search">
+          <input type="search" id="historySearch" placeholder="Ady, bölümi, telefon ýa-da e-poçta boýunça gözleg...">
+        </div>
+        <div class="compare-hint">
+          Ýazga basyň — deňeşdirmek üçin saýlaň (2 çenli). Edit — forma ýüklemek.
+        </div>
+        <ul class="history-list" id="historyList"></ul>
+        <div class="empty" id="historyEmpty">Baza boş</div>
+        <div class="compare-box" id="compareBox">
+          <h3>Deňeşdirme</h3>
+          <div class="compare-grid" id="compareGrid"></div>
+          <button type="button" id="compareClose" style="margin-top:10px;">Ýapmak</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
