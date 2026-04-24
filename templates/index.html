@@ -9,13 +9,18 @@
 <body>
 <div class="wrap">
   <div class="hero">
-    <h1>QR kod generatory</h1>
-    <div class="subtitle">Işgärler üçin vCard kontakt kartlaryny dörediň we dolandyryň</div>
-    <!-- <div class="badges">
-      <span class="badge"><span class="dot"></span> Flask + SQLite</span>
-      <span class="badge">vCard 3.0</span>
-      <span class="badge">PNG eksport</span>
-    </div> -->
+    <div class="hero-row">
+      <div>
+        <h1>QR kod generatory</h1>
+        <div class="subtitle">Işgärler üçin vCard kontakt kartlaryny dörediň we dolandyryň</div>
+      </div>
+      {% if username %}
+      <div class="user-box">
+        <span>{{ username }}</span>
+        <a href="{{ url_for('logout') }}" class="logout-link">Çykmak</a>
+      </div>
+      {% endif %}
+    </div>
   </div>
 
   <div class="grid">
@@ -30,44 +35,47 @@
         </div>
         <h2>Işgär maglumatlary</h2>
         <form id="form" novalidate>
-          <div class="row">
-            <div class="field">
-              <label>Familiýa <span class="req">*</span></label>
-              <input type="text" id="lastName" required>
-              <div class="error" data-for="lastName">Familiýany giriziň</div>
-            </div>
-            <div class="field">
-              <label>Ady <span class="req">*</span></label>
-              <input type="text" id="firstName" required>
-              <div class="error" data-for="firstName">Adyny giriziň</div>
-            </div>
+          <div class="field">
+            <label>Bölüm ady</label>
+            <input type="text" id="department" placeholder="PÜweMHB">
           </div>
           <div class="field">
             <label>Wezipe</label>
-            <input type="text" id="title">
+            <input type="text" id="title" placeholder="başlygy">
           </div>
           <div class="field">
-            <label>Bölüm ady</label>
-            <input type="text" id="department">
+            <label>Ady we familiýasy <span class="req">*</span></label>
+            <input type="text" id="fullName" placeholder="M.Gasanow" required>
+            <div class="error" data-for="fullName">Ady giriziň</div>
           </div>
-          <div class="row">
-            <div class="field">
-              <label>Telefon</label>
-              <input type="tel" id="phone" placeholder="+99366666666">
-              <div class="hint">Diňe + we sanlar</div>
-              <div class="error" data-for="phone">Nädogry telefon belgisi</div>
-            </div>
-            <div class="field">
-              <label>E-poçta</label>
-              <input type="email" id="email" placeholder="ady@mysal.com">
-              <div class="error" data-for="email">Nädogry e-poçta</div>
-            </div>
+          <div class="field">
+            <label>Telefon</label>
+            <input type="tel" id="phone" placeholder="93-01-66">
+            <div class="hint">Diňe + we sanlar</div>
+            <div class="error" data-for="phone">Nädogry telefon belgisi</div>
           </div>
         </form>
       </div>
 
       <div class="card" style="margin-top: 20px;">
         <h2>QR sazlamalary</h2>
+        <div class="field">
+          <label>QR rejimi</label>
+          <div class="mode-group">
+            <label class="mode-option">
+              <input type="radio" name="qrMode" value="text" checked>
+              <span><b>Tekst</b><small>Skanerde zametka hökmünde görkeziler</small></span>
+            </label>
+            <label class="mode-option">
+              <input type="radio" name="qrMode" value="vcard">
+              <span><b>vCard</b><small>Kontakty saklamak teklip ediler</small></span>
+            </label>
+            <label class="mode-option">
+              <input type="radio" name="qrMode" value="tel">
+              <span><b>Tel:</b><small>Derrew jaň üçin tayyarlanar</small></span>
+            </label>
+          </div>
+        </div>
         <div class="field">
           <label>Faýl ady</label>
           <input type="text" id="fileName">
@@ -93,7 +101,7 @@
           </div>
         </div>
         <div class="buttons">
-          <button type="button" id="previewBtn" class="ghost-blue">vCard öňünden görkezmek</button>
+          <button type="button" id="previewBtn" class="ghost-blue">QR mazmunyny görkezmek</button>
           <button type="button" id="saveBtn" class="success">Saklamak we döretmek</button>
           <button type="button" id="downloadBtn" class="ghost-green" disabled>PNG göçürip almak</button>
         </div>
@@ -110,8 +118,8 @@
       </div>
 
       <div class="card" style="margin-top: 20px;">
-        <h2>vCard</h2>
-        <div class="preview-vcard" id="vcardPreview">"vCard öňünden görkezmek" düwmesine basyň</div>
+        <h2>QR mazmuny</h2>
+        <div class="preview-vcard" id="vcardPreview">"QR mazmunyny görkezmek" düwmesine basyň</div>
       </div>
 
       <div class="card" style="margin-top: 20px;">
@@ -120,7 +128,7 @@
           <button type="button" id="refreshBtn" class="ghost-blue">Täzelemek</button>
         </div>
         <div class="history-search">
-          <input type="search" id="historySearch" placeholder="Ady, bölümi, telefon ýa-da e-poçta boýunça gözleg...">
+          <input type="search" id="historySearch" placeholder="Ady, bölümi ýa-da telefon boýunça gözleg...">
         </div>
         <div class="compare-hint">
           Ýazga basyň — deňeşdirmek üçin saýlaň (2 çenli). Edit — forma ýüklemek.

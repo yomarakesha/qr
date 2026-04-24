@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="tk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Giriş — QR vCard</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="login-body">
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-hero">
+      <h1>QR kod generatory</h1>
+      <div class="subtitle">Dowam etmek üçin ulgama giriň</div>
+    </div>
+    <form method="post" class="login-form">
+      <div class="field">
+        <label>Ulanyjy ady</label>
+        <input type="text" name="username" autocomplete="username" autofocus required>
+      </div>
+      <div class="field">
+        <label>Parol</label>
+        <input type="password" name="password" autocomplete="current-password" required>
+      </div>
+      {% if error %}
+        <div class="login-error">{{ error }}</div>
+      {% endif %}
+      <button type="submit" class="success login-btn">Girmek</button>
+    </form>
+  </div>
+</div>
+</body>
+</html>

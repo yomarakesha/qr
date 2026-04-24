@@ -14,17 +14,17 @@
   function translit(s){
     return s.split('').map(c => translitMap[c] !== undefined ? translitMap[c] : c).join('');
   }
-  function makeFileName(last, first){
-    const base = translit((last || '') + '_' + (first || ''))
+  function makeFileName(name){
+    const base = translit(name || '')
       .replace(/[^A-Za-z0-9_\-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
     return base ? base + '_qr' : 'contact_qr';
   }
 
   const $ = id => document.getElementById(id);
   const fields = {
-    lastName: $('lastName'), firstName: $('firstName'),
+    fullName: $('fullName'),
     title: $('title'), department: $('department'),
-    phone: $('phone'), email: $('email'),
+    phone: $('phone'),
     fileName: $('fileName'), size: $('size'), ecl: $('ecl')
   };
   const qrBox = $('qrBox');
@@ -60,20 +60,28 @@
     }
   }
   function clearAllErrors(){
-    ['lastName','firstName','phone','email'].forEach(id => showError(id, false));
+    ['fullName','phone'].forEach(id => showError(id, false));
+  }
+
+  function getQrMode(){
+    const el = document.querySelector('input[name="qrMode"]:checked');
+    return el ? el.value : 'text';
+  }
+  function setQrMode(v){
+    const el = document.querySelector('input[name="qrMode"][value="' + (v || 'text') + '"]');
+    if (el) el.checked = true;
   }
 
   function getData(){
     return {
-      lastName: fields.lastName.value.trim(),
-      firstName: fields.firstName.value.trim(),
+      fullName: fields.fullName.value.trim(),
       title: fields.title.value.trim(),
       department: fields.department.value.trim(),
       phone: fields.phone.value.trim(),
-      email: fields.email.value.trim(),
-      fileName: fields.fileName.value.trim() || makeFileName(fields.lastName.value.trim(), fields.firstName.value.trim()),
+      fileName: fields.fileName.value.trim() || makeFileName(fields.fullName.value.trim()),
       size: parseInt(fields.size.value, 10),
-      ecl: fields.ecl.value
+      ecl: fields.ecl.value,
+      qrMode: getQrMode()
     };
   }
 
@@ -85,10 +93,11 @@
   async function apiFetch(url, opts){
     const res = await fetch(url, opts);
     const ct = res.headers.get('content-type') || '';
+    if (res.status === 401){ window.location.href = '/login'; throw new Error('Unauthorized'); }
     if (!res.ok){
       let body = {};
       if (ct.includes('application/json')) body = await res.json().catch(()=>({}));
-      const err = new Error(body.errors ? 'Ошибка валидации' : ('HTTP ' + res.status));
+      const err = new Error(body.errors ? 'Ýalňyşlyk' : ('HTTP ' + res.status));
       err.errors = body.errors || null;
       throw err;
     }
@@ -111,7 +120,7 @@
       });
       currentQrId = saved.id;
       editingId = saved.id;
-      editLabel.textContent = ((saved.firstName || '') + ' ' + (saved.lastName || '')).trim();
+      editLabel.textContent = saved.fullName || '';
       editBanner.classList.add('show');
       await loadQrImage(saved.id);
       await loadVcardPreview(saved.id);
@@ -168,36 +177,34 @@
     editingId = null;
     editBanner.classList.remove('show');
     fileNameTouched = false;
-    fields.lastName.value = '';
-    fields.firstName.value = '';
+    fields.fullName.value = '';
     fields.title.value = '';
     fields.department.value = '';
     fields.phone.value = '';
-    fields.email.value = '';
     fields.fileName.value = '';
     fields.size.value = '600';
     fields.ecl.value = 'M';
+    setQrMode('text');
     clearAllErrors();
     qrBox.innerHTML = '<span class="qr-placeholder">QR saklandan soň görkeziler</span>';
-    vcardPreview.textContent = '"vCard öňünden görkezmek" düwmesine basyň';
+    vcardPreview.textContent = '"QR mazmunyny görkezmek" düwmesine basyň';
     downloadBtn.disabled = true;
     currentQrId = null;
   }
 
   function enterEditMode(item){
-    fields.lastName.value = item.lastName || '';
-    fields.firstName.value = item.firstName || '';
+    fields.fullName.value = item.fullName || '';
     fields.title.value = item.title || '';
     fields.department.value = item.department || '';
     fields.phone.value = item.phone || '';
-    fields.email.value = item.email || '';
     fields.fileName.value = item.fileName || '';
     fileNameTouched = true;
     if (item.size) fields.size.value = String(item.size);
     if (item.ecl) fields.ecl.value = item.ecl;
+    setQrMode(item.qrMode || 'text');
     editingId = item.id;
     currentQrId = item.id;
-    editLabel.textContent = ((item.firstName || '') + ' ' + (item.lastName || '')).trim();
+    editLabel.textContent = item.fullName || '';
     editBanner.classList.add('show');
     clearAllErrors();
     loadQrImage(item.id);
@@ -246,8 +253,8 @@
       const li = document.createElement('li');
       li.className = 'history-item';
       if (selectedForCompare.includes(item.id)) li.classList.add('selected');
-      const fullName = ((item.firstName || '') + ' ' + (item.lastName || '')).trim() || '(без имени)';
-      const meta = [item.department, item.title, item.phone, item.email].filter(Boolean).join(' · ');
+      const fullName = (item.fullName || '').trim() || '(без имени)';
+      const meta = [item.department, item.title, item.phone].filter(Boolean).join(' · ');
       const ts = (item.updatedAt && item.updatedAt !== item.createdAt)
         ? 'Üýtgedildi: ' + formatTs(item.updatedAt)
         : 'Döredildi: ' + formatTs(item.createdAt);
@@ -308,10 +315,11 @@
     const b = cachedContacts.find(e => e.id === selectedForCompare[1]);
     if (!a || !b){ box.classList.remove('show'); return; }
     const keys = [
-      ['lastName','Фамилия'], ['firstName','Имя'],
-      ['title','Должность'], ['department','Отдел'],
-      ['phone','Телефон'], ['email','Email'],
-      ['size','Размер'], ['ecl','Коррекция'], ['fileName','Файл']
+      ['department','Bölüm'],
+      ['title','Wezipe'],
+      ['fullName','Ady'],
+      ['phone','Telefon'],
+      ['size','Ölçeg'], ['ecl','Düzediş'], ['fileName','Faýl']
     ];
     function col(e, title){
       let html = '<h4>' + escapeHtml(title) + '</h4>';
@@ -324,8 +332,8 @@
       });
       return html;
     }
-    grid.innerHTML = '<div class="compare-col">' + col(a, ((a.firstName||'')+' '+(a.lastName||'')).trim() || ('#'+a.id)) + '</div>' +
-                     '<div class="compare-col">' + col(b, ((b.firstName||'')+' '+(b.lastName||'')).trim() || ('#'+b.id)) + '</div>';
+    grid.innerHTML = '<div class="compare-col">' + col(a, (a.fullName || '').trim() || ('#'+a.id)) + '</div>' +
+                     '<div class="compare-col">' + col(b, (b.fullName || '').trim() || ('#'+b.id)) + '</div>';
     box.classList.add('show');
   }
 
@@ -335,11 +343,13 @@
 
   function autoFillFileName(){
     if (fileNameTouched) return;
-    fields.fileName.value = makeFileName(fields.lastName.value.trim(), fields.firstName.value.trim());
+    fields.fileName.value = makeFileName(fields.fullName.value.trim());
   }
-  fields.lastName.addEventListener('input', () => { autoFillFileName(); if (fields.lastName.value.trim()) showError('lastName', false); });
-  fields.firstName.addEventListener('input', () => { autoFillFileName(); if (fields.firstName.value.trim()) showError('firstName', false); });
+  fields.fullName.addEventListener('input', () => { autoFillFileName(); if (fields.fullName.value.trim()) showError('fullName', false); });
   fields.fileName.addEventListener('input', () => { fileNameTouched = true; });
+  document.querySelectorAll('input[name="qrMode"]').forEach(r => {
+    r.addEventListener('change', () => { showError('phone', false); });
+  });
 
   $('previewBtn').addEventListener('click', previewVcard);
   $('saveBtn').addEventListener('click', saveContact);
