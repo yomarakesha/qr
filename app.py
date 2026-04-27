@@ -9,6 +9,7 @@ from werkzeug.security import check_password_hash
 
 import qrcode
 from qrcode.constants import ERROR_CORRECT_L, ERROR_CORRECT_M, ERROR_CORRECT_Q, ERROR_CORRECT_H
+from PIL import Image
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("DB_PATH", os.path.join(BASE_DIR, "contacts.db"))
@@ -329,7 +330,7 @@ def render_qr_png(text, size=600, ecl="M"):
     qr.add_data(text)
     qr.make(fit=True)
     img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
-    img = img.resize((size, size))
+    img = img.resize((size, size), Image.NEAREST)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     buf.seek(0)
