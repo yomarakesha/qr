@@ -135,12 +135,12 @@ def clean_phone(s):
 def build_vcard(c):
     lines = ["BEGIN:VCARD", "VERSION:3.0"]
     name = (c.get("fullName") or "").strip()
-    lines.append(f"N:{escape_vcard(name)};;;;")
-    lines.append(f"FN:{escape_vcard(name)}")
+    lines.append(f"N;CHARSET=UTF-8:{escape_vcard(name)};;;;")
+    lines.append(f"FN;CHARSET=UTF-8:{escape_vcard(name)}")
     if c.get("department"):
-        lines.append(f"ORG:{escape_vcard(c['department'])}")
+        lines.append(f"ORG;CHARSET=UTF-8:{escape_vcard(c['department'])}")
     if c.get("title"):
-        lines.append(f"TITLE:{escape_vcard(c['title'])}")
+        lines.append(f"TITLE;CHARSET=UTF-8:{escape_vcard(c['title'])}")
     if c.get("phone"):
         lines.append(f"TEL;TYPE=CELL:{clean_phone(c['phone'])}")
     lines.append("END:VCARD")
