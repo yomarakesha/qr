@@ -24,7 +24,7 @@
   const fields = {
     fullName: $('fullName'),
     title: $('title'), department: $('department'),
-    phone: $('phone'),
+    phone: $('phone'), email: $('email'),
     fileName: $('fileName'), size: $('size'), ecl: $('ecl')
   };
   const qrBox = $('qrBox');
@@ -60,7 +60,7 @@
     }
   }
   function clearAllErrors(){
-    ['fullName','phone'].forEach(id => showError(id, false));
+    ['fullName','phone','email'].forEach(id => showError(id, false));
   }
 
   function getQrMode(){
@@ -78,6 +78,7 @@
       title: fields.title.value.trim(),
       department: fields.department.value.trim(),
       phone: fields.phone.value.trim(),
+      email: fields.email.value.trim(),
       fileName: fields.fileName.value.trim() || makeFileName(fields.fullName.value.trim()),
       size: parseInt(fields.size.value, 10),
       ecl: fields.ecl.value,
@@ -181,6 +182,7 @@
     fields.title.value = '';
     fields.department.value = '';
     fields.phone.value = '';
+    fields.email.value = '';
     fields.fileName.value = '';
     fields.size.value = '600';
     fields.ecl.value = 'M';
@@ -197,6 +199,7 @@
     fields.title.value = item.title || '';
     fields.department.value = item.department || '';
     fields.phone.value = item.phone || '';
+    fields.email.value = item.email || '';
     fields.fileName.value = item.fileName || '';
     fileNameTouched = true;
     if (item.size) fields.size.value = String(item.size);
@@ -254,7 +257,7 @@
       li.className = 'history-item';
       if (selectedForCompare.includes(item.id)) li.classList.add('selected');
       const fullName = (item.fullName || '').trim() || '(без имени)';
-      const meta = [item.department, item.title, item.phone].filter(Boolean).join(' · ');
+      const meta = [item.department, item.title, item.phone, item.email].filter(Boolean).join(' · ');
       const ts = (item.updatedAt && item.updatedAt !== item.createdAt)
         ? 'Üýtgedildi: ' + formatTs(item.updatedAt)
         : 'Döredildi: ' + formatTs(item.createdAt);
@@ -319,6 +322,7 @@
       ['title','Wezipe'],
       ['fullName','Ady'],
       ['phone','Telefon'],
+      ['email','Email'],
       ['size','Ölçeg'], ['ecl','Düzediş'], ['fileName','Faýl']
     ];
     function col(e, title){
@@ -347,6 +351,7 @@
   }
   fields.fullName.addEventListener('input', () => { autoFillFileName(); if (fields.fullName.value.trim()) showError('fullName', false); });
   fields.fileName.addEventListener('input', () => { fileNameTouched = true; });
+  fields.email.addEventListener('input', () => { showError('email', false); });
   document.querySelectorAll('input[name="qrMode"]').forEach(r => {
     r.addEventListener('change', () => { showError('phone', false); });
   });

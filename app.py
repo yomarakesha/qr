@@ -68,6 +68,8 @@ def init_db():
         conn.execute("ALTER TABLE contacts ADD COLUMN full_name TEXT NOT NULL DEFAULT ''")
     if "qr_mode" not in cols:
         conn.execute("ALTER TABLE contacts ADD COLUMN qr_mode TEXT NOT NULL DEFAULT 'text'")
+    if "email" not in cols:
+        conn.execute("ALTER TABLE contacts ADD COLUMN email TEXT DEFAULT ''")
     conn.execute("""
         UPDATE contacts
            SET full_name = TRIM(COALESCE(first_name,'') || ' ' || COALESCE(last_name,''))
@@ -78,6 +80,7 @@ def init_db():
 
 
 PHONE_RE = re.compile(r"^\+?[0-9 ()\-]+$")
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 QR_MODES = {"vcard", "text", "tel"}
 
 
@@ -90,6 +93,9 @@ def validate(data, partial=False):
     if phone:
         if not PHONE_RE.match(phone) or len(re.sub(r"\D", "", phone)) < 6:
             errors["phone"] = "Nädogry telefon"
+    email = (data.get("email") or "").strip()
+    if email and not EMAIL_RE.match(email):
+        errors["email"] = "Nädogry email"
     ecl = (data.get("ecl") or "M").upper()
     if ecl not in ECL_MAP:
         errors["ecl"] = "Düzediş derejesi L/M/Q/H bolmaly"
@@ -115,6 +121,7 @@ def row_to_dict(row):
         "title": row["title"],
         "department": row["department"],
         "phone": row["phone"],
+        "email": row["email"] if "email" in row.keys() else "",
         "fileName": row["file_name"],
         "size": row["size"],
         "ecl": row["ecl"],
@@ -143,6 +150,8 @@ def build_vcard(c):
         lines.append(f"TITLE;CHARSET=UTF-8:{escape_vcard(c['title'])}")
     if c.get("phone"):
         lines.append(f"TEL;TYPE=CELL:{clean_phone(c['phone'])}")
+    if c.get("email"):
+        lines.append(f"EMAIL;TYPE=INTERNET:{escape_vcard(c['email'])}")
     lines.append("END:VCARD")
     return "\r\n".join(lines)
 
@@ -153,6 +162,7 @@ def build_text(c):
     if c.get("title"):      parts.append(f"Wezipe: {c['title']}")
     if c.get("fullName"):   parts.append(f"Ady: {c['fullName']}")
     if c.get("phone"):      parts.append(f"Tel.: {c['phone']}")
+    if c.get("email"):      parts.append(f"Email: {c['email']}")
     return "\n".join(parts)
 
 
@@ -216,7 +226,7 @@ def list_contacts():
     if q:
         def hay(x):
             return " ".join([
-                x["fullName"], x["department"], x["title"], x["phone"]
+                x["fullName"], x["department"], x["title"], x["phone"], x["email"]
             ]).lower()
         items = [x for x in items if q in hay(x)]
     return jsonify(items)
@@ -243,13 +253,14 @@ def create_contact():
     db = get_db()
     cur = db.execute(
         """INSERT INTO contacts
-           (full_name, title, department, phone, file_name, size, ecl, qr_mode, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           (full_name, title, department, phone, email, file_name, size, ecl, qr_mode, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             (data.get("fullName") or "").strip(),
             (data.get("title") or "").strip(),
             (data.get("department") or "").strip(),
             (data.get("phone") or "").strip(),
+            (data.get("email") or "").strip(),
             (data.get("fileName") or "").strip(),
             int(data.get("size") or 600),
             (data.get("ecl") or "M").upper(),
@@ -277,13 +288,14 @@ def update_contact(cid):
     db.execute(
         """UPDATE contacts SET
            full_name=?, title=?, department=?,
-           phone=?, file_name=?, size=?, ecl=?, qr_mode=?, updated_at=?
+           phone=?, email=?, file_name=?, size=?, ecl=?, qr_mode=?, updated_at=?
            WHERE id=?""",
         (
             (data.get("fullName") or "").strip(),
             (data.get("title") or "").strip(),
             (data.get("department") or "").strip(),
             (data.get("phone") or "").strip(),
+            (data.get("email") or "").strip(),
             (data.get("fileName") or "").strip(),
             int(data.get("size") or 600),
             (data.get("ecl") or "M").upper(),
