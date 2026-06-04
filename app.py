@@ -11,6 +11,10 @@ import qrcode
 from qrcode.constants import ERROR_CORRECT_L, ERROR_CORRECT_M, ERROR_CORRECT_Q, ERROR_CORRECT_H
 from PIL import Image
 
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.utils import get_column_letter
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("DB_PATH", os.path.join(BASE_DIR, "contacts.db"))
 
@@ -26,6 +30,8 @@ def get_db():
         db = g._db = sqlite3.connect(DB_PATH)
         db.row_factory = sqlite3.Row
         db.execute("PRAGMA foreign_keys = ON")
+        # Unicode-aware lowercasing for case-insensitive search (SQLite LOWER is ASCII-only)
+        db.create_function("pylower", 1, lambda s: (s or "").lower())
     return db
 
 
@@ -216,20 +222,86 @@ def index():
     return render_template("index.html", username=session.get("user"))
 
 
+SORT_COLUMNS = {
+    "updated": "updated_at",
+    "created": "created_at",
+    "name": "full_name",
+    "department": "department",
+}
+
+
+def contacts_filters(args):
+    """Build a WHERE clause + params from query args (q / department / qrMode)."""
+    where, params = [], []
+    q = (args.get("q") or "").strip().lower()
+    if q:
+        like = f"%{q}%"
+        where.append(
+            "(pylower(full_name) LIKE ? OR pylower(department) LIKE ? "
+            "OR pylower(title) LIKE ? OR pylower(phone) LIKE ? OR pylower(email) LIKE ?)"
+        )
+        params += [like, like, like, like, like]
+    department = (args.get("department") or "").strip()
+    if department:
+        where.append("department = ?")
+        params.append(department)
+    mode = (args.get("qrMode") or "").strip().lower()
+    if mode in QR_MODES:
+        where.append("COALESCE(qr_mode, 'text') = ?")
+        params.append(mode)
+    where_sql = (" WHERE " + " AND ".join(where)) if where else ""
+    return where_sql, params
+
+
 @app.get("/api/contacts")
 @login_required
 def list_contacts():
-    q = request.args.get("q", "").strip().lower()
+    args = request.args
+    where_sql, params = contacts_filters(args)
+
+    sort_col = SORT_COLUMNS.get((args.get("sort") or "updated").lower(), "updated_at")
+    direction = "ASC" if (args.get("dir") or "desc").lower() == "asc" else "DESC"
+
+    try:
+        page = max(1, int(args.get("page", 1)))
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        page_size = int(args.get("pageSize", 20))
+    except (TypeError, ValueError):
+        page_size = 20
+    page_size = min(max(page_size, 1), 100)
+
     db = get_db()
-    rows = db.execute("SELECT * FROM contacts ORDER BY updated_at DESC").fetchall()
-    items = [row_to_dict(r) for r in rows]
-    if q:
-        def hay(x):
-            return " ".join([
-                x["fullName"], x["department"], x["title"], x["phone"], x["email"]
-            ]).lower()
-        items = [x for x in items if q in hay(x)]
-    return jsonify(items)
+    total = db.execute(f"SELECT COUNT(*) FROM contacts{where_sql}", params).fetchone()[0]
+    pages = max(1, (total + page_size - 1) // page_size)
+    page = min(page, pages)
+    offset = (page - 1) * page_size
+
+    rows = db.execute(
+        f"SELECT * FROM contacts{where_sql} "
+        f"ORDER BY {sort_col} COLLATE NOCASE {direction}, id DESC LIMIT ? OFFSET ?",
+        params + [page_size, offset],
+    ).fetchall()
+
+    return jsonify({
+        "items": [row_to_dict(r) for r in rows],
+        "total": total,
+        "page": page,
+        "pageSize": page_size,
+        "pages": pages,
+    })
+
+
+@app.get("/api/departments")
+@login_required
+def list_departments():
+    db = get_db()
+    rows = db.execute(
+        "SELECT DISTINCT department FROM contacts "
+        "WHERE TRIM(COALESCE(department, '')) <> '' ORDER BY department COLLATE NOCASE"
+    ).fetchall()
+    return jsonify([r[0] for r in rows])
 
 
 @app.get("/api/contacts/<int:cid>")
@@ -393,6 +465,176 @@ def preview_vcard():
     if errors:
         return jsonify({"errors": errors}), 400
     return jsonify({"vcard": build_payload(data), "mode": (data.get("qrMode") or "text").lower()})
+
+
+# ---------- Excel import / export ----------
+EXCEL_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+# Column order used for both export and the import template.
+EXPORT_HEADERS = [
+    "Bölüm", "Wezipe", "Ady we familiýasy", "Telefon", "Email",
+    "QR rejimi", "Ölçeg", "ECL", "Faýl ady",
+]
+EXPORT_KEYS = [
+    "department", "title", "fullName", "phone", "email",
+    "qrMode", "size", "ecl", "fileName",
+]
+COL_WIDTHS = [16, 16, 24, 18, 28, 12, 9, 8, 22]
+
+# Header text -> internal key (accepts Turkmen / English / Russian aliases, case-insensitive).
+HEADER_ALIASES = {
+    "department": ["bölüm", "bolum", "bölüm ady", "bolum ady", "department", "отдел"],
+    "title":      ["wezipe", "title", "должность", "lavazym"],
+    "fullName":   ["ady we familiýasy", "ady we familiyasy", "ady", "full name",
+                   "fullname", "fio", "имя", "ф.и.о."],
+    "phone":      ["telefon", "phone", "tel", "телефон"],
+    "email":      ["email", "e-mail", "почта", "эл. почта"],
+    "qrMode":     ["qr rejimi", "qr mode", "qrmode", "mode", "rejim", "режим"],
+    "size":       ["ölçeg", "olceg", "size", "размер"],
+    "ecl":        ["ecl", "düzediş", "duzedis", "коррекция"],
+    "fileName":   ["faýl ady", "fayl ady", "faýl", "fayl", "file name", "filename", "файл"],
+}
+
+
+def style_sheet(ws):
+    fill = PatternFill("solid", fgColor="2563EB")
+    font = Font(bold=True, color="FFFFFF")
+    align = Alignment(vertical="center")
+    for cell in ws[1]:
+        cell.fill = fill
+        cell.font = font
+        cell.alignment = align
+    ws.row_dimensions[1].height = 22
+    for i, w in enumerate(COL_WIDTHS, start=1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+    ws.freeze_panes = "A2"
+
+
+def workbook_response(wb, filename):
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(buf, mimetype=EXCEL_MIME, as_attachment=True, download_name=filename)
+
+
+@app.get("/api/contacts/export.xlsx")
+@login_required
+def export_contacts():
+    where_sql, params = contacts_filters(request.args)
+    db = get_db()
+    rows = db.execute(
+        f"SELECT * FROM contacts{where_sql} ORDER BY full_name COLLATE NOCASE", params
+    ).fetchall()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Kontaktlar"
+    ws.append(EXPORT_HEADERS)
+    for r in rows:
+        c = row_to_dict(r)
+        ws.append([c.get(k, "") for k in EXPORT_KEYS])
+    style_sheet(ws)
+    return workbook_response(wb, "kontaktlar.xlsx")
+
+
+@app.get("/api/contacts/template.xlsx")
+@login_required
+def template_contacts():
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Şablon"
+    ws.append(EXPORT_HEADERS)
+    ws.append(["PÜweMHB", "başlygy", "M.Gasanow", "+993 12 93-01-66",
+               "m.gasanow@example.com", "vcard", 600, "M", "M_Gasanow_qr"])
+    ws.append(["Buhgalteriýa", "hasapçy", "A.Myradow", "+993 12 45-67-89",
+               "a.myradow@example.com", "text", 600, "M", ""])
+    style_sheet(ws)
+    # Sample rows in a softer style so they read as examples, not real data.
+    sample_font = Font(italic=True, color="64748B")
+    for row in ws.iter_rows(min_row=2, max_row=3):
+        for cell in row:
+            cell.font = sample_font
+    return workbook_response(wb, "kontaktlar_shablon.xlsx")
+
+
+def map_header(header_row):
+    """Map column index -> internal key based on a header row."""
+    lookup = {}
+    for key, aliases in HEADER_ALIASES.items():
+        for a in aliases:
+            lookup[a] = key
+    colmap = {}
+    for idx, cell in enumerate(header_row or []):
+        if cell is None:
+            continue
+        name = str(cell).strip().lower()
+        if name in lookup:
+            colmap[idx] = lookup[name]
+    return colmap
+
+
+@app.post("/api/contacts/import")
+@login_required
+def import_contacts():
+    file = request.files.get("file")
+    if not file or not file.filename:
+        return jsonify({"error": "Faýl tapylmady"}), 400
+    try:
+        wb = load_workbook(file, read_only=True, data_only=True)
+    except Exception:
+        return jsonify({"error": "Excel faýly okap bolmady (.xlsx gerek)"}), 400
+
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        return jsonify({"created": 0, "failed": 0, "errors": []})
+
+    colmap = map_header(rows[0])
+    if not colmap:
+        return jsonify({"error": "Sütün atlary tapylmady. Şablony ulanyň."}), 400
+
+    db = get_db()
+    created = 0
+    errors = []
+    for line_no, raw in enumerate(rows[1:], start=2):
+        data = {}
+        for idx, key in colmap.items():
+            if idx >= len(raw):
+                continue
+            val = raw[idx]
+            if val is None:
+                continue
+            if isinstance(val, float) and val.is_integer():
+                val = int(val)
+            sval = str(val).strip()
+            if sval:
+                data[key] = sval
+        if not data:
+            continue  # fully empty row
+        errs = validate(data)
+        if errs:
+            errors.append({"row": line_no, "errors": errs})
+            continue
+        now = int(time.time() * 1000)
+        db.execute(
+            """INSERT INTO contacts
+               (full_name, title, department, phone, email, file_name, size, ecl, qr_mode, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                (data.get("fullName") or "").strip(),
+                (data.get("title") or "").strip(),
+                (data.get("department") or "").strip(),
+                (data.get("phone") or "").strip(),
+                (data.get("email") or "").strip(),
+                (data.get("fileName") or "").strip(),
+                int(data.get("size") or 600),
+                (data.get("ecl") or "M").upper(),
+                (data.get("qrMode") or "text").lower(),
+                now, now,
+            ),
+        )
+        created += 1
+    db.commit()
+    return jsonify({"created": created, "failed": len(errors), "errors": errors[:50]})
 
 
 init_db()

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>QR vCard — Kontakt generatory</title>
+<script>try{var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -14,12 +15,15 @@
         <h1>QR kod generatory</h1>
         <div class="subtitle">Işgärler üçin vCard kontakt kartlaryny dörediň we dolandyryň</div>
       </div>
-      {% if username %}
-      <div class="user-box">
-        <span>{{ username }}</span>
-        <a href="{{ url_for('logout') }}" class="logout-link">Çykmak</a>
+      <div class="hero-actions">
+        <button type="button" id="themeToggle" class="theme-toggle" title="Tema çalyşmak" aria-label="Tema"></button>
+        {% if username %}
+        <div class="user-box">
+          <span>{{ username }}</span>
+          <a href="{{ url_for('logout') }}" class="logout-link">Çykmak</a>
+        </div>
+        {% endif %}
       </div>
-      {% endif %}
     </div>
   </div>
 
@@ -130,16 +134,53 @@
       <div class="card" style="margin-top: 20px;">
         <div class="history-header">
           <h2>Kontaktlar bazasy <span class="count" id="historyCount">0</span></h2>
-          <button type="button" id="refreshBtn" class="ghost-blue">Täzelemek</button>
+          <div class="toolbar-actions">
+            <button type="button" id="templateBtn" class="ghost-blue" title="Excel şablony göçürip almak"></button>
+            <button type="button" id="importBtn" class="ghost-blue" title="Excel-den import etmek"></button>
+            <button type="button" id="exportBtn" class="ghost-green" title="Excel-e eksport etmek"></button>
+            <button type="button" id="refreshBtn" class="ghost-blue" title="Täzelemek"></button>
+            <input type="file" id="importFile" accept=".xlsx" hidden>
+          </div>
         </div>
+
+        <div class="import-result" id="importResult"></div>
+
         <div class="history-search">
+          <span class="search-ic" id="searchIcon"></span>
           <input type="search" id="historySearch" placeholder="Ady, bölümi ýa-da telefon boýunça gözleg...">
         </div>
+
+        <div class="filter-bar">
+          <select id="filterDept" title="Bölüm boýunça süzgüç">
+            <option value="">Ähli bölümler</option>
+          </select>
+          <select id="filterMode" title="QR rejimi boýunça süzgüç">
+            <option value="">Ähli rejimler</option>
+            <option value="text">Tekst</option>
+            <option value="vcard">vCard</option>
+            <option value="tel">Tel</option>
+          </select>
+          <select id="sortKey" title="Tertipleşdirmek">
+            <option value="updated">Üýtgedilen wagty</option>
+            <option value="created">Döredilen wagty</option>
+            <option value="name">Ady boýunça</option>
+            <option value="department">Bölüm boýunça</option>
+          </select>
+          <button type="button" id="sortDirBtn" class="ghost-blue" data-dir="desc" title="Tertip ugry"></button>
+        </div>
+
         <div class="compare-hint">
           Ýazga basyň — deňeşdirmek üçin saýlaň (2 çenli). Edit — forma ýüklemek.
         </div>
         <ul class="history-list" id="historyList"></ul>
         <div class="empty" id="historyEmpty">Baza boş</div>
+
+        <div class="pagination" id="pagination">
+          <button type="button" id="prevPage" class="ghost-blue" title="Öňki"></button>
+          <span id="pageInfo">1 / 1</span>
+          <button type="button" id="nextPage" class="ghost-blue" title="Indiki"></button>
+        </div>
+
         <div class="compare-box" id="compareBox">
           <h3>Deňeşdirme</h3>
           <div class="compare-grid" id="compareGrid"></div>
